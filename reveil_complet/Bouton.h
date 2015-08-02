@@ -1,3 +1,5 @@
+/// \file Bouton.h
+/// \author ultrakiwi
 #ifndef BOUTON_H
 #define BOUTON_H
 
@@ -10,21 +12,16 @@ public:
 	Bouton(const int & pinBP, const bool & etatRepos = LOW);
 	~Bouton(void) {};
 
-	void listen(void) {
+	void listen(void)
+	{
 		m_etatPrecedent = m_etatActuel;
 		m_etatActuel = digitalRead(m_pinBP);
 	}
 
-	bool pressed(void) const {
-		return m_etatActuel == m_niveauAppui;
-	}
-	bool released(void) const {
-		return !pressed();
-	}
+	bool pressed(void) const { return m_etatActuel == m_niveauAppui; }
+	bool released(void) const { return !pressed(); }
 
-	bool onPress(void) const {
-		return (pressed() && (m_etatPrecedent != m_niveauAppui));
-	}
+	bool onPress(void) const { return (pressed() && (m_etatPrecedent != m_niveauAppui)); }
 
 private:
 	const int m_pinBP;		///< broche sur laquelle est connecté le bouton
