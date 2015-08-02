@@ -1,0 +1,189 @@
+/// Réveil programmable.
+/// Gère l'heure actuelle et l'heure programmable ; tout s'affiche sur un
+/// écran LCD. A l'heure programmée, la sortie de l'alarme passe à l'état haut.
+/// Navigation affichage de l'heure -> réglage heure actuelle -> réglage heure réveil
+/// via un BP ; 2 autres BP pour ajuster les heures / les minutes.
+/// Problèmes :
+/// le réveil est toujours activé
+/// les boutons ne répondent pas très bien (prob de rebonds, temps de réponse car pas de fonctionnement
+/// sur interruption)
+/// Points d'amélioration :
+/// refactoriser le code (séparer en plusieurs classes, cf classe AlarmeMgr). Créer par exemple une classe
+/// gérant l'affichage, et une gérant le réglage des heures (gestion horloge + BP)
+/// mieux gérer les boutons
+/// meilleure gestion du temps (via une horloge dédiée)
+/// Pouvoir éteindre l'alarme quand elle se déclenche (actuellement elle reste en marche une minute)
+
+
+#include <LiquidCrystal.h>
+#include <Time.h>
+#include "AlarmeMgr.h"
+
+static const int pinRS = 2; // broche de l'autorisation de lecture du LCD
+static const int pinE = 3; // broche E (activation du registre) du LCD
+static const int pinD4 = 4; // broche D4 du LCD
+static const int pinD5 = 5; // broche D5 du LCD
+static const int pinD6 = 6; // broche D6 du LCD
+static const int pinD7 = 7; // broche D7 du LCD
+
+static const int pinBPHeure = 9;  // pour le réglage de l'heure
+static const int pinBPMinute = 10;  // pour le réglage des minutes
+static const int pinBPReglage = 8;  // pour commander le réglage
+static const int pinSortieReveil = 11;  // commande du dispositif de réveil
+
+LiquidCrystal lcd(pinRS, pinE, pinD4, pinD5, pinD6, pinD7);
+
+// états possibles
+static const int AFFICHAGE_HEURE = 0;
+static const int REGLAGE_HEURE_ACTUELLE = 1;
+static const int REGLAGE_HEURE_REVEIL = 2;
+
+static int etatActuel = REGLAGE_HEURE_ACTUELLE;
+
+// ancien état des BP ; permet de détecter les fronts
+static int oldBPHeure = HIGH;
+static int oldBPMinute = HIGH;
+static int oldBPReglage = HIGH;
+
+AlarmeMgr alarme;
+
+/// Initialisation du module.
+void setup()
+{
+  lcd.begin(16, 2); // 16 caractères par ligne, 2 lignes
+
+  pinMode(pinBPHeure, INPUT);
+  pinMode(pinBPMinute, INPUT);
+  pinMode(pinBPReglage, INPUT);
+  //pinMode(pinSortieReveil, OUTPUT);
+
+  alarme.setup(pinSortieReveil, now(), true);
+
+  lcd.noAutoscroll();
+  Serial.begin(9600);
+}
+
+/// Gère les interactions utilisateurs pouvant modifier une certaine heure (actuelle ou réveil).
+/// \return heure modifiée
+time_t reglerHeure(time_t heureOrigine)
+{
+  // on scinde le temps en champs exploitables
+  tmElements_t heureDecomposee;
+  breakTime(heureOrigine, heureDecomposee);
+
+  // réglage des heures
+  if (digitalRead(pinBPHeure) == LOW
+      && oldBPHeure == HIGH)
+  {
+    heureDecomposee.Hour = heureDecomposee.Hour + 1;
+
+    if (heureDecomposee.Hour >= 24)
+      heureDecomposee.Hour = 0;
+
+    Serial.println(heureDecomposee.Hour);
+  }
+  oldBPHeure = digitalRead(pinBPHeure);
+
+  // réglage des minutes
+  if (digitalRead(pinBPMinute) == LOW
+      && oldBPMinute == HIGH)
+  {
+    heureDecomposee.Minute = heureDecomposee.Minute + 1;
+
+    if (heureDecomposee.Minute >= 60)
+      heureDecomposee.Minute = 0;
+
+    Serial.println(heureDecomposee.Minute);
+  }
+  oldBPMinute = digitalRead(pinBPMinute);
+
+  return makeTime(heureDecomposee);
+}
+
+/// Affiche une heure sur l'écran LCD.
+void afficherHeure(int heures, int minutes, int secondes, int ligne)
+{
+  lcd.setCursor(0, ligne);
+  String heureAffichee;
+
+  if (heures < 10)
+    heureAffichee += String("0");
+
+  heureAffichee += String(heures);
+  heureAffichee += String(":");
+
+  if (minutes < 10)
+    heureAffichee += String("0");
+
+  heureAffichee += String(minutes);
+  heureAffichee += String(":");
+
+  if (secondes < 10)
+    heureAffichee += String("0");
+
+  heureAffichee += String(secondes);
+  lcd.print(heureAffichee);
+  Serial.println(heureAffichee);
+}
+
+void loop()
+{
+  switch (etatActuel)
+  {
+    case AFFICHAGE_HEURE:
+      lcd.setCursor(0, 0);
+      afficherHeure(hour(), minute(), second(), 0);
+
+      if (digitalRead(pinBPReglage) == LOW) // changement d'état
+      {
+        etatActuel = REGLAGE_HEURE_ACTUELLE;
+        lcd.clear();
+      }
+      break;
+
+    case REGLAGE_HEURE_ACTUELLE:
+      {
+        time_t heureActuelle = now();
+        heureActuelle = reglerHeure(heureActuelle);
+        setTime(heureActuelle);
+        lcd.setCursor(0, 0);
+        lcd.print("reglage horloge");
+        afficherHeure(hour(), minute(), second(), 1);
+
+        if (digitalRead(pinBPReglage) == LOW) // changement d'état
+        {
+          etatActuel = REGLAGE_HEURE_REVEIL;
+          lcd.clear();
+        }
+        break;
+      }
+
+    case REGLAGE_HEURE_REVEIL:
+      {
+        alarme.setHeureAlarme( reglerHeure(alarme.getHeureAlarme()) );
+        lcd.setCursor(0, 0);
+        lcd.print("reglage reveil");
+        tmElements_t heureDecomposee;
+        breakTime(alarme.getHeureAlarme(), heureDecomposee);
+        afficherHeure(heureDecomposee.Hour, heureDecomposee.Minute, heureDecomposee.Second, 1);
+
+        if (digitalRead(pinBPReglage) == LOW
+            && oldBPReglage == HIGH) // changement d'état
+        {
+          etatActuel = AFFICHAGE_HEURE;
+          lcd.clear();
+        }
+        oldBPReglage == digitalRead(pinBPReglage);
+        break;
+      }
+
+    default:
+      Serial.println("Erreur dans la machine d'etats : etat inconnu!");
+      break;
+  }
+
+  alarme.loop();
+
+  delay(1000);
+}
+
