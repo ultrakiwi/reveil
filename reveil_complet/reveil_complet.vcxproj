@@ -83,7 +83,9 @@
     <ClInclude Include="Visual Micro\.reveil_complet.vsarduino.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="reveil_complet.ino" />
+    <None Include="reveil_complet.ino">
+      <FileType>CppCode</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
