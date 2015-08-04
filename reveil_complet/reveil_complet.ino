@@ -234,6 +234,11 @@ void loop()
 	switch (etatActuel)
 	{
 	case AFFICHAGE_HEURE_ACTUELLE:
+		if (alarme.activerAlarme())// changement d'état
+		{
+			automate.transitionTo(etatReveil);
+			break;
+		}
 		if (BPReglage.onPress())// changement d'état
 			automate.transitionTo(etatReglageHeureActuelle);
 
