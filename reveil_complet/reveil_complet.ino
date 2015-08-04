@@ -8,9 +8,6 @@
 /// via un appui sur le bouton Heures (quand on est en mode affichage de l'heure actuelle).
 /// Lorsque l'alarme est activable, l'heure programmée est affichée en plus de l'heure actuelle.
 /// L'ensemble est géré par une machine d'états.
-///
-/// Points d'amélioration :
-/// meilleure gestion du temps (via une horloge dédiée)
 
 #include <FiniteStateMachine.h>
 #include <LiquidCrystal.h>
@@ -47,19 +44,22 @@ enum IdEtats
 {
 	AFFICHAGE_HEURE_ACTUELLE,
 	REGLAGE_HEURE_ACTUELLE,
-	REGLAGE_HEURE_REVEIL
+	REGLAGE_HEURE_REVEIL,
+	REVEIL
 };
 
 // initialisation des états de l'automate
 State etatAffichageHeureActuelle(entreeAffichageHeureActuelle, afficherHeureActuelle, NO_EXIT);
 State etatReglageHeureActuelle(entreeReglageHeureActuelle, reglageHeureActuelle, NO_EXIT);
 State etatReglageHeureReveil(entreeReglageHeureReveil, reglageHeureReveil, NO_EXIT);
+State etatReveil(entreeReveil, reveiller, couperReveil);
+
 // initialisation de l'automate lui-même
 FiniteStateMachine automate(etatAffichageHeureActuelle);
 IdEtats etatActuel = AFFICHAGE_HEURE_ACTUELLE;
 
 // initialisation du gestionnaire d'alarme
-AlarmeMgr alarme(pinSortieReveil, now(), false);
+AlarmeMgr alarme(pinSortieReveil, now(), false, false);
 
 /// Initialisation du module.
 void setup()
@@ -149,6 +149,16 @@ void reglageHeureActuelle(void)
 	afficherHeure(hour(), minute(), second(), 1);
 }
 
+void reveiller(void)
+{
+	// rien à faire pour l'instant, une fois que AlarmeMgr est défini actif tout se passe tout seul
+}
+
+void couperReveil(void)
+{
+	alarme.setAlarmeActive(false);
+}
+
 /// Efface l'écran LCD.
 void effacerEcran(void)
 {
@@ -205,6 +215,15 @@ void entreeReglageHeureReveil(void)
 	etatActuel = REGLAGE_HEURE_REVEIL;
 }
 
+/// Méthode appelée lorsqu'on entre dans l'état "réveil".
+void entreeReveil(void)
+{
+	Serial.println("Passage a l'etat REVEIL");
+	effacerEcran();
+	etatActuel = REVEIL;
+	alarme.setAlarmeActive(true);
+}
+
 void loop()
 {
 	// Rafraîchissement de l'état des boutons
@@ -215,6 +234,11 @@ void loop()
 	switch (etatActuel)
 	{
 	case AFFICHAGE_HEURE_ACTUELLE:
+		if (alarme.activerAlarme())// changement d'état
+		{
+			automate.transitionTo(etatReveil);
+			break;
+		}
 		if (BPReglage.onPress())// changement d'état
 			automate.transitionTo(etatReglageHeureActuelle);
 
@@ -228,8 +252,19 @@ void loop()
 
 	case REGLAGE_HEURE_REVEIL:
 		if (BPReglage.onPress())// changement d'état
+		{
 			automate.transitionTo(etatAffichageHeureActuelle);
+			break;
+		}
+		break;
 
+	case REVEIL:
+		if (BPReglage.onPress()
+			|| BPHeure.onPress()
+			|| BPMinute.onPress())	//  n'importe quel bouton coupe l'alarme
+		{
+			automate.transitionTo(etatAffichageHeureActuelle);
+		}
 		break;
 
 	default:
