@@ -117,20 +117,26 @@ void incrementerMinutes(uint8_t & minutes)
 
 void reglageHeureReveil(void)
 {
-	alarme.setHeureAlarme(reglerHeure(alarme.getHeureAlarme()));
-	lcd.setCursor(0, 0);
+	// on scinde le temps en champs exploitables
 	tmElements_t heureDecomposee;
 	breakTime(alarme.getHeureAlarme(), heureDecomposee);
 
 	// réglage de l'heure de réveil
+	if (BPHeure.onPress())
 	{
 		incrementerHeure(heureDecomposee.Hour);
 	}
 
 	// réglage des minutes
 	if (BPMinute.onPress())
+	{
 		incrementerMinutes(heureDecomposee.Minute);
 	}
+
+	alarme.setHeureAlarme(makeTime(heureDecomposee));
+
+	lcd.setCursor(0, 0);
+	lcd.print("reglage reveil");
 	afficherHeure(heureDecomposee.Hour, heureDecomposee.Minute, heureDecomposee.Second, 1);
 }
 
