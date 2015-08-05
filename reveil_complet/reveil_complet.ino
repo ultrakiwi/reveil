@@ -72,39 +72,6 @@ void setup()
 	Serial.begin(9600);
 }
 
-/// Gère les interactions utilisateurs pouvant modifier une certaine heure (actuelle ou réveil).
-/// \return heure modifiée
-time_t reglerHeure(time_t heureOrigine)
-{
-	// on scinde le temps en champs exploitables
-	tmElements_t heureDecomposee;
-	breakTime(heureOrigine, heureDecomposee);
-
-	// réglage des heures
-	if (BPHeure.onPress())
-	{
-		heureDecomposee.Hour = heureDecomposee.Hour + 1;
-
-		if (heureDecomposee.Hour >= 24)
-			heureDecomposee.Hour = 0;
-
-		Serial.println(heureDecomposee.Hour);
-	}
-
-	// réglage des minutes
-	if (BPMinute.onPress())
-	{
-		heureDecomposee.Minute = heureDecomposee.Minute + 1;
-
-		if (heureDecomposee.Minute >= 60)
-			heureDecomposee.Minute = 0;
-
-		Serial.println(heureDecomposee.Minute);
-	}
-
-	return makeTime(heureDecomposee);
-}
-
 /// Affiche une heure sur l'écran LCD.
 void afficherHeure(int heures, int minutes, int secondes, int ligne)
 {
@@ -129,21 +96,64 @@ void afficherHeure(int heures, int minutes, int secondes, int ligne)
 	heureAffichee += String(secondes);
 	lcd.print(heureAffichee);
 }
+
+/// Incrémente une heure en controlant la validité.
+void incrementerHeure(uint8_t & heure)
+{
+	if (++heure >= 24)
+		heure = 0;
+
+	Serial.println(heure);
+}
+
+/// Incrémente les minutes en controlant la validité.
+void incrementerMinutes(uint8_t & minutes)
+{
+	if (++minutes >= 60)
+		minutes = 0;
+
+	Serial.println(minutes);
+}
+
 void reglageHeureReveil(void)
 {
 	alarme.setHeureAlarme(reglerHeure(alarme.getHeureAlarme()));
 	lcd.setCursor(0, 0);
-	lcd.print("reglage reveil");
 	tmElements_t heureDecomposee;
 	breakTime(alarme.getHeureAlarme(), heureDecomposee);
+
+	// réglage de l'heure de réveil
+	{
+		incrementerHeure(heureDecomposee.Hour);
+	}
+
+	// réglage des minutes
+	if (BPMinute.onPress())
+		incrementerMinutes(heureDecomposee.Minute);
+	}
 	afficherHeure(heureDecomposee.Hour, heureDecomposee.Minute, heureDecomposee.Second, 1);
 }
 
 void reglageHeureActuelle(void)
 {
-	time_t heureActuelle = now();
-	heureActuelle = reglerHeure(heureActuelle);
-	setTime(heureActuelle);
+	// on scinde le temps en champs exploitables
+	tmElements_t heureDecomposee;
+	breakTime(now(), heureDecomposee);
+
+	// réglage de l'heure actuelle
+	if (BPHeure.onPress())
+	{
+		incrementerHeure(heureDecomposee.Hour);
+	}
+
+	// réglage des minutes
+	if (BPMinute.onPress())
+	{
+		incrementerMinutes(heureDecomposee.Minute);
+	}
+
+	setTime(makeTime(heureDecomposee));
+
 	lcd.setCursor(0, 0);
 	lcd.print("reglage horloge");
 	afficherHeure(hour(), minute(), second(), 1);
@@ -151,7 +161,10 @@ void reglageHeureActuelle(void)
 
 void reveiller(void)
 {
-	// rien à faire pour l'instant, une fois que AlarmeMgr est défini actif tout se passe tout seul
+	afficherHeure(hour(), minute(), second(), 0);
+	String MsgReveil("Debout!");
+	lcd.setCursor(0, 1);
+	lcd.print(MsgReveil);
 }
 
 void couperReveil(void)
