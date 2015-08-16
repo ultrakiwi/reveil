@@ -4,59 +4,60 @@
 #include <Arduino.h>
 #include <Time.h>
 
-/// gestionnaire d'alarme
+
+/// gestionnaire d'alarmes.
 class AlarmeMgr
 {
 public:
-	AlarmeMgr(int pinCommandeSonnerie, 
-		time_t heureAlarme, 
-		bool alarmeActivable,
-		bool alarmeActive) :
+
+	static const int NB_ALARMES_MAX = 4;	///< nombre maximal d'alarmes
+
+	AlarmeMgr(int pinCommandeSonnerie)
+		:
 		m_pinCommandeSonnerie(pinCommandeSonnerie),
-		m_heureAlarme(heureAlarme),
-		m_alarmeActivable(alarmeActivable),
-		m_alarmeActive(alarmeActive)
+		m_nbAlarmes(0),
+		m_alarmeActive(false)
 	{
 		pinMode(m_pinCommandeSonnerie, OUTPUT);
 	}
 
 
-	const time_t & getHeureAlarme(void) { return m_heureAlarme; }
-	void setHeureAlarme(time_t heure) { m_heureAlarme = heure; }
-
-	bool activable(void) const { return m_alarmeActivable; }
-	void activable(bool activable) { m_alarmeActivable = activable; }
+	const time_t & getHeureAlarme(const int & ind) { return m_heureAlarme[ind]; }
+	void setHeureAlarme(const int & ind, time_t heure) { m_heureAlarme[ind] = heure; }
 
 	bool getAlarmeActive(void) const { return m_alarmeActive; }
 	void setAlarmeActive(bool active) { m_alarmeActive = active; }
 
+	int getNbAlarmes(void) const { return m_nbAlarmes; }
+	void setNbAlarmes(const unsigned int & nb) { if (nb <= NB_ALARMES_MAX) m_nbAlarmes = nb; }
+
 	/// Vrai si l'alarme doit être déclenchée.
-	/// Critère actuel : l'heure actuelle est égale à l'heure de l'alarme
-	/// (comparaison des heures, minutes et secondes), et l'alarme est activable.
+	/// Critère actuel : l'heure actuelle est égale à l'heure d'une l'alarme
+	/// (comparaison des heures, minutes et secondes), et cette alarme est activable.
 	/// _return true si l'alarme doit être activée.
 	bool activerAlarme(void)
 	{
-		if(!m_alarmeActivable)	// pas d'activation si elle n'est pas activable
-			return false;
-		else
+		for (int i(0); i < m_nbAlarmes; ++i)
 		{
 			tmElements_t heureReveilDecomposee;
-			breakTime(m_heureAlarme, heureReveilDecomposee);
-			return (heureReveilDecomposee.Hour == hour()
+			breakTime(m_heureAlarme[i], heureReveilDecomposee);
+			if (heureReveilDecomposee.Hour == hour()
 				&& heureReveilDecomposee.Minute == minute()
-				&& heureReveilDecomposee.Second == second());
+				&& heureReveilDecomposee.Second == second())
+				return true;
 		}
+		return false;
 	}
 
 	void loop()
 	{
-		digitalWrite(m_pinCommandeSonnerie, (m_alarmeActive ? HIGH : LOW) );
+		digitalWrite(m_pinCommandeSonnerie, (m_alarmeActive ? HIGH : LOW));
 	}
 
 private:
-	int		m_pinCommandeSonnerie;	///< broche d'activation de la sonnerie
-	time_t	m_heureAlarme;			///< heure à laquelle déclencher l'alarme
-	bool	m_alarmeActivable;		///< vrai si l'alarme peut sonner
-	bool	m_alarmeActive;			///< vrai si l'alarme est actuellement activée
+	int		m_pinCommandeSonnerie;			///< broche d'activation de la sonnerie
+	int m_nbAlarmes;						///< nombre d'alarmes actives
+	time_t m_heureAlarme[NB_ALARMES_MAX];	///< heure d'activation des alarmes
+	bool	m_alarmeActive;					///< vrai si l'alarme est actuellement activée
 };
 #endif //ALARMEMGR_H

@@ -19,6 +19,8 @@
 
 const bool etatAppui = HIGH;  // état d'un bouton quand on appuie dessus
 
+int indAlarme(0);
+
 Bouton BPReglage(PIN_BP_MENU, etatAppui);
 Bouton BPHeure(PIN_BP_H, etatAppui);
 Bouton BPMinute(PIN_BP_MIN, etatAppui);
@@ -30,7 +32,8 @@ enum IdEtats
 	AFFICHAGE_HEURE_ACTUELLE,
 	REGLAGE_HEURE_ACTUELLE,
 	REGLAGE_HEURE_REVEIL,
-	REVEIL
+	REVEIL,
+	SET_NB_ALARMES
 };
 
 InterfaceIO m_IO;
@@ -46,14 +49,14 @@ State etatAffichageHeureActuelle(entreeAffichageHeureActuelle, afficherHeureActu
 State etatReglageHeureActuelle(entreeReglageHeureActuelle, reglageHeureActuelle, NO_EXIT);
 State etatReglageHeureReveil(entreeReglageHeureReveil, reglageHeureReveil, NO_EXIT);
 State etatReveil(entreeReveil, reveiller, couperReveil);
+State etatNbAlarmes(entreeNbAlarmes, reglageNbAlarmes, NO_EXIT);
 
 // initialisation de l'automate lui-même
 FiniteStateMachine automate(etatAffichageHeureActuelle);
 IdEtats etatActuel = AFFICHAGE_HEURE_ACTUELLE;
 
 // initialisation du gestionnaire d'alarme
-AlarmeMgr alarme(PIN_SORTIE_REVEIL, now(), false, false);
-
+AlarmeMgr alarme(PIN_SORTIE_REVEIL);
 
 
 /// Initialisation du module.
@@ -87,10 +90,10 @@ void reglageHeureReveil(void)
 {
 	// on scinde le temps en champs exploitables
 	tmElements_t heureDecomposee;
-	breakTime(alarme.getHeureAlarme(), heureDecomposee);
+	breakTime(alarme.getHeureAlarme(indAlarme), heureDecomposee);
 
 	// réglage de l'heure de réveil
-	if(BPHeure.onPress())
+	if (BPHeure.onPress())
 	{
 		incrementerHeure(heureDecomposee.Hour);
 	}
@@ -101,9 +104,9 @@ void reglageHeureReveil(void)
 		incrementerMinutes(heureDecomposee.Minute);
 	}
 
-	alarme.setHeureAlarme(makeTime(heureDecomposee));
+	alarme.setHeureAlarme(indAlarme, makeTime(heureDecomposee));
 
-	m_IO.afficherMessage("reglage reveil", 0);
+	m_IO.afficherMessage(String("reglage reveil ") + (indAlarme + 1), 0);
 	m_IO.afficherHeure(heureDecomposee.Hour, heureDecomposee.Minute, heureDecomposee.Second, 1);
 }
 
@@ -114,13 +117,13 @@ void reglageHeureActuelle(void)
 	breakTime(now(), heureDecomposee);
 
 	// réglage de l'heure actuelle
-	if(BPHeure.onPress())
+	if (BPHeure.onPress())
 	{
 		incrementerHeure(heureDecomposee.Hour);
 	}
 
 	// réglage des minutes
-	if(BPMinute.onPress())
+	if (BPMinute.onPress())
 	{
 		incrementerMinutes(heureDecomposee.Minute);
 	}
@@ -134,6 +137,23 @@ void reveiller(void)
 {
 	m_IO.afficherHeure(hour(), minute(), second(), 0);
 	m_IO.afficherMessage("Debout!", 1);
+}
+
+void reglageNbAlarmes(void)
+{
+	// 
+	if (BPHeure.onPress())
+	{
+		alarme.setNbAlarmes(alarme.getNbAlarmes() - 1);
+		m_IO.afficherMessage(String("Nb alarmes : ") + String(alarme.getNbAlarmes()), 0);
+	}
+
+	//
+	if (BPMinute.onPress())
+	{
+		alarme.setNbAlarmes(alarme.getNbAlarmes() + 1);
+		m_IO.afficherMessage(String("Nb alarmes : ") + String(alarme.getNbAlarmes()), 0);
+	}
 }
 
 void couperReveil(void)
@@ -152,26 +172,7 @@ void entreeAffichageHeureActuelle(void)
 /// Méthode appelée à chaque cycle quand on est dans l'état "afficher heure actuelle".
 void afficherHeureActuelle(void)
 {
-	if(BPHeure.onPress()) // armement / désarmement de l'alarme
-	{
-		alarme.activable() ? alarme.activable(false) : alarme.activable(true);
-		alarme.activable() ? Serial.println("alarme ON") : Serial.println("alarme OFF");
-		m_IO.effacerEcran(); // nécessaire, sinon le message reste quand on désactive l'alarme		
-	}
-
 	m_IO.afficherHeure(hour(), minute(), second(), 0);
-
-	if (alarme.activable())
-	{
-		tmElements_t heureReveilDecomposee;
-		breakTime(alarme.getHeureAlarme(), heureReveilDecomposee);
-
-		m_IO.afficherMessage(String("Reveil a ")
-			+ (heureReveilDecomposee.Hour < 10 ? "0" : "")
-			+ String(heureReveilDecomposee.Hour) + "h"
-			+ (heureReveilDecomposee.Minute < 10 ? "0" : "")
-			+ String(heureReveilDecomposee.Minute), 1);
-	}
 }
 
 /// Méthode appelée lorsqu'on entre dans l'état "réglage heure actuelle".
@@ -199,6 +200,14 @@ void entreeReveil(void)
 	alarme.setAlarmeActive(true);
 }
 
+void entreeNbAlarmes(void)
+{
+	Serial.println("Passage a l'etat set Nb alarmes");
+	m_IO.effacerEcran();
+	m_IO.afficherMessage(String("Nb alarmes : ") + String(alarme.getNbAlarmes()), 0);
+	etatActuel = SET_NB_ALARMES;
+}
+
 void loop()
 {
 	// Rafraîchissement de l'état des boutons
@@ -221,15 +230,29 @@ void loop()
 
 	case REGLAGE_HEURE_ACTUELLE:
 		if (BPReglage.onPress())// changement d'état
-			automate.transitionTo(etatReglageHeureReveil);
+			automate.transitionTo(etatNbAlarmes);
 
+		break;
+
+	case SET_NB_ALARMES:
+		if (BPReglage.onPress())// changement d'état
+		{
+			// on change d'état si on a parcouru toutes les alarmes
+			indAlarme = 0;
+			if (alarme.getNbAlarmes() != 0)
+				automate.transitionTo(etatReglageHeureReveil);
+			else // cas où aucune alarme n'est active
+				automate.transitionTo(etatAffichageHeureActuelle);
+		}
 		break;
 
 	case REGLAGE_HEURE_REVEIL:
 		if (BPReglage.onPress())// changement d'état
 		{
-			automate.transitionTo(etatAffichageHeureActuelle);
-			break;
+			// on change d'état si on a parcouru toutes les alarmes
+			if (++indAlarme >= alarme.getNbAlarmes())
+				automate.transitionTo(etatAffichageHeureActuelle);
+
 		}
 		break;
 
