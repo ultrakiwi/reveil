@@ -13,7 +13,7 @@
 #define __AVR_ATmega328p__
 #define __AVR_ATmega328P__
 #define F_CPU 16000000L
-#define ARDUINO 174
+#define ARDUINO 176
 #define ARDUINO_AVR_UNO
 #define ARDUINO_ARCH_AVR
 #define __cplusplus
@@ -86,4 +86,6 @@ extern "C" void __cxa_pure_virtual() {;}
 #include <reveil_complet.ino>
 #include <AlarmeMgr.h>
 #include <Bouton.h>
+#include <InterfaceIO.cpp>
+#include <InterfaceIO.h>
 #endif

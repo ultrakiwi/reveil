@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Visual Micro\.reveil.vsarduino.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="AlarmeMgr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -27,8 +24,16 @@
     <ClInclude Include="Visual Micro\.reveil_complet.vsarduino.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="InterfaceIO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="reveil_complet.ino" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="InterfaceIO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
